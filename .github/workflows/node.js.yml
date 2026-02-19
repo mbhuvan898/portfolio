@@ -1,0 +1,48 @@
+name: Docker Build → Scan → Push
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  IMAGE_NAME: portfolio
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ Setup Docker Buildx
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 3️⃣ Login DockerHub
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 4️⃣ Build Docker image (ROOT PROJECT)
+      - name: Build Docker Image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest .
+
+      # 5️⃣ Scan Docker image (Trivy)
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+          format: table
+          exit-code: 0
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+
+      # 6️⃣ Push image to DockerHub
+      - name: Push Docker Image
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
